@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import { pingDatabase } from "./db.js";
 import { requestContext } from "./middleware/context.js";
 import { errorHandler, notFoundHandler } from "./middleware/errors.js";
+import { createApiRouter } from "./routes/index.js";
 
 // Exported as a factory rather than a module-level singleton so supertest can build
 // an app per test file without binding a port.
@@ -28,7 +29,7 @@ export function createApp(): Express {
     }
   });
 
-  // API routes mount here in Phase 3, behind `authenticate`.
+  app.use("/api", createApiRouter());
 
   // Order matters: unmatched routes become a 404 in the same envelope as every other
   // error, and the error handler is last so it sees everything.
