@@ -199,7 +199,7 @@ async function seed(connection: PoolConnection): Promise<void> {
       let metInLastSeven = 0;
 
       dates.forEach((date, index) => {
-        const offset = SEED_WINDOW_DAYS - 1 - index;
+        const offset = dates.length - 1 - index;
         const value = habit.valueFor(offset);
         if (value === null) return;
 
@@ -208,11 +208,10 @@ async function seed(connection: PoolConnection): Promise<void> {
         if (offset < 7 && value >= habit.targetValue) metInLastSeven += 1;
       });
 
-      const unit = habit.unit ? ` ${habit.unit}` : "";
+      const target = `${habit.targetValue}${habit.unit ? ` ${habit.unit}` : ""}`;
       console.log(
-        `  ${habit.name.padEnd(12)} target ${String(habit.targetValue).padStart(5)}${unit.padEnd(9)}` +
-          ` ${habit.aggregation.padEnd(4)} ${String(logged).padStart(2)} logs, ` +
-          `${metInLastSeven}/7 days met`,
+        `  ${habit.name.padEnd(12)} ${habit.aggregation.padEnd(4)} target ${target.padEnd(12)}` +
+          `${String(logged).padStart(2)} logs, ${metInLastSeven}/7 met`,
       );
     }
   }
@@ -220,15 +219,16 @@ async function seed(connection: PoolConnection): Promise<void> {
   if (logRows.length > 0) {
     // Bulk `VALUES ?` expansion is a mysql2 query() feature. execute() uses prepared
     // statements, which do not expand arrays — the same trap as `IN (?)`.
+    //
+    // logged_at is left to its column default: it records when the row was written,
+    // which for seed data is genuinely now. local_date is the field carrying meaning
+    // here, and inventing a plausible historical instant per row would be false
+    // precision.
     await connection.query("INSERT INTO habit_logs (habit_id, user_id, value, local_date) VALUES ?", [
       logRows,
     ]);
   }
 
-  // logged_at is left to its column default. It records when the row was written,
-  // which for backfilled seed data is genuinely now; local_date is the field that
-  // carries meaning here, and inventing a plausible historical instant for each row
-  // would be false precision.
   console.log(`\nInserted ${logRows.length} habit logs.`);
 }
 
@@ -245,8 +245,22 @@ async function main(): Promise<void> {
       console.log("Reseeding (--force).");
     }
 
+    // TRUNCATE commits implicitly in MySQL, so it cannot take part in a transaction
+    // and runs on its own first.
     await clearExistingData(connection);
-    await seed(connection);
+
+    // The logs go in as one bulk insert after every habit is written, so a failure
+    // there would otherwise leave users and habits committed — and the next plain
+    // run would see rows, report "already seeded", and skip, leaving a half-seeded
+    // database that looks fine until a dashboard comes back empty.
+    await connection.beginTransaction();
+    try {
+      await seed(connection);
+      await connection.commit();
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    }
   } finally {
     connection.release();
     await pool.end();
