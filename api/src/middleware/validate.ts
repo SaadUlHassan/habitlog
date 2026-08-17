@@ -1,4 +1,5 @@
-import type { Request, RequestHandler } from "express";
+import type { RequestHandler } from "express";
+import type { ParamsDictionary, Query } from "express-serve-static-core";
 import { z, type ZodType } from "zod";
 import { validationFailed } from "./errors.js";
 
@@ -14,8 +15,8 @@ const SOURCES = ["params", "query", "body"] as const;
 // "Cannot set property query of #<IncomingMessage> which has only a getter".
 // defineProperty works for all three sources, so all three take the same path rather
 // than one being special-cased.
-function replaceSource(req: Request, source: (typeof SOURCES)[number], value: unknown): void {
-  Object.defineProperty(req, source, {
+function replaceSource(target: object, source: (typeof SOURCES)[number], value: unknown): void {
+  Object.defineProperty(target, source, {
     value,
     writable: true,
     configurable: true,
@@ -34,7 +35,9 @@ function replaceSource(req: Request, source: (typeof SOURCES)[number], value: un
  * req.params during route matching, so a router mounted after this ran would overwrite
  * the parsed params with freshly matched string ones.
  */
-export function validate(sources: ValidationSources): RequestHandler {
+export function validate<Params = ParamsDictionary, Body = unknown, ReqQuery = Query>(
+  sources: ValidationSources,
+): RequestHandler<Params, unknown, Body, ReqQuery> {
   return (req, _res, next) => {
     for (const source of SOURCES) {
       const schema = sources[source];

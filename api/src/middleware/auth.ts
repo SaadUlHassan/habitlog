@@ -54,8 +54,11 @@ export const authenticate: RequestHandler = async (req, _res, next) => {
  * Reads the authenticated user, or fails loudly if the route was mounted without
  * `authenticate`. That is a wiring mistake rather than a client error, so it surfaces
  * as a 500 instead of silently treating the request as anonymous.
+ *
+ * Typed by the one field it reads rather than by Request, so it accepts handlers whose
+ * params and body have been narrowed by validate().
  */
-export function requireUser(req: Request): AuthUser {
+export function requireUser(req: Pick<Request, "user">): AuthUser {
   if (req.user === undefined) {
     throw new AppError(500, "INTERNAL_ERROR", "Route is missing authentication middleware");
   }
