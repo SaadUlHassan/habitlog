@@ -29,6 +29,13 @@ CREATE TABLE habits (
   archived_at  TIMESTAMP NULL,
   created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
+  -- A target of zero would make every day a counting day and quietly render every
+  -- streak meaningless, so it is refused here and not only in request validation.
+  CONSTRAINT ck_habits_target_positive CHECK (target_value > 0),
+  -- Enforces the rule the API applies on creation: re-logging a boolean habit under
+  -- 'sum' would accumulate to 2, and the day cell would read "2 of 1 done".
+  CONSTRAINT ck_habits_boolean_last CHECK (kind <> 'boolean' OR aggregation = 'last'),
+
   CONSTRAINT fk_habits_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
   -- Parent key for habit_logs' composite foreign key below. Redundant on its own,
   -- since id is already the primary key.
