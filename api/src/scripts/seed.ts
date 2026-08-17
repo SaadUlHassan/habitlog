@@ -1,4 +1,5 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import { truncateAllTables } from "../data/reset.js";
 import { pool } from "../db.js";
 import { localDateFor, priorLocalDates } from "../domain/dates.js";
 
@@ -159,18 +160,6 @@ async function isAlreadySeeded(connection: PoolConnection): Promise<boolean> {
   return Number(rows[0]?.user_count ?? 0) > 0;
 }
 
-async function clearExistingData(connection: PoolConnection): Promise<void> {
-  // TRUNCATE rather than DELETE so AUTO_INCREMENT restarts and the seeded ids are
-  // stable — the README hands out `dev-user-1` and `dev-user-2` as login tokens.
-  // MySQL refuses to truncate a table another table references, hence the toggle,
-  // and it has to run on one connection because the setting is session-scoped.
-  await connection.query("SET FOREIGN_KEY_CHECKS = 0");
-  await connection.query("TRUNCATE TABLE habit_logs");
-  await connection.query("TRUNCATE TABLE habits");
-  await connection.query("TRUNCATE TABLE users");
-  await connection.query("SET FOREIGN_KEY_CHECKS = 1");
-}
-
 async function seed(connection: PoolConnection): Promise<void> {
   const now = new Date();
   const logRows: Array<[number, number, number, string]> = [];
@@ -247,7 +236,7 @@ async function main(): Promise<void> {
 
     // TRUNCATE commits implicitly in MySQL, so it cannot take part in a transaction
     // and runs on its own first.
-    await clearExistingData(connection);
+    await truncateAllTables(connection);
 
     // The logs go in as one bulk insert after every habit is written, so a failure
     // there would otherwise leave users and habits committed — and the next plain
