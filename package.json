@@ -9,12 +9,14 @@
   ],
   "scripts": {
     "prepare": "node scripts/ensure-env.mjs",
-    "dev": "npm run db:up && (npm run dev:api & npm run dev:web & wait)",
+    "dev": "npm run db:up && npm run db:seed && (npm run dev:api & npm run dev:web & wait)",
     "dev:api": "npm run dev --workspace=api",
     "dev:web": "npm run dev --workspace=web",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
-    "db:reset": "docker compose down -v && npm run db:up",
+    "db:seed": "npm run seed --workspace=api",
+    "db:seed:force": "npm run seed --workspace=api -- --force",
+    "db:reset": "docker compose down -v && npm run db:up && npm run db:seed",
     "test": "npm run test --workspace=api",
     "typecheck": "npm run typecheck --workspace=api && npm run typecheck --workspace=web"
   },
