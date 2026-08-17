@@ -122,14 +122,40 @@ no logs, and users with no habits. Ownership enforced in the query.
 
 ## Production gap
 
-Real auth (the middleware is the seam; it publishes `req.user` and no route reads an
-identity from anywhere else, so it is a one file swap). `Idempotency-Key` on the log
-endpoint. A migration tool instead of init-mounted SQL. A separate test database:
-integration tests currently truncate the development one. Rate limiting, `helmet`, a
-CORS allow-list. Connection pool and index tuning, and the streak window query. An audit
-trail for health data access, and secrets from a manager rather than `.env`.
+Roughly in the order these would start to hurt.
 
-`TIMESTAMP` columns cap out in 2038. Fine here, worth knowing.
+**Security and access.** Real auth, which is a one file swap: the middleware publishes
+`req.user` and no route reads an identity from anywhere else. Rate limiting on the log
+endpoint, `helmet`, a CORS allow-list. `app.set('trust proxy', ...)` before any of that,
+or rate limiting keys on the load balancer's IP and throttles every user as one. Secrets
+from a manager, dependency scanning in CI, and an audit trail for health data access.
+
+**Correctness under load.** `Idempotency-Key` on the log endpoint. That is the only gap
+here that changes behaviour rather than performance. Request timeouts, so one slow query
+cannot hold a connection until the pool starves. Pool size tied to the server's
+`max_connections` instead of left at 10.
+
+**Data at scale.** The streak reads 90 days per habit and walks them in Node. At volume
+that becomes a gaps-and-islands window function. Then: pagination on habits and logs,
+`habit_logs` partitioned by `local_date`, and a retention policy, which for health data
+under PDPA is arguably required rather than optional. Backups with point-in-time
+recovery. `TIMESTAMP` caps out in 2038.
+
+**Frontend at scale.** Search is a `useMemo` filter over an already loaded list, so
+debouncing it today would add latency and buy nothing. It matters the moment the list is
+paginated and search moves server side, and then it needs three things together: a
+debounced input, the `AbortSignal` TanStack Query passes into the query function so
+superseded requests are actually cancelled, and `placeholderData: keepPreviousData` so
+results do not flash empty between keystrokes. If the client side list alone ever got
+big enough to feel janky, `useDeferredValue` is the tool for that, not a debounce.
+Separately: a React error boundary, since a render error currently blanks the page, list
+virtualisation past a few hundred cards, and route level code splitting.
+
+**Operations.** `compression` and ETags. Split `/health` into liveness and readiness:
+the current probe fails when the database is down, which would pull a pod out of
+rotation for a dependency it could have waited on. Metrics and traces, not only logs. A
+migration tool instead of init-mounted SQL. A separate test database, because the
+integration tests truncate the development one today.
 
 ## Time spent
 
