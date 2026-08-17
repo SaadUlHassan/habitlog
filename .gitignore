@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+
+# Exercise material and working notes — not part of the deliverable.
+# Note this is deliberately not `*.md`: the README is a required deliverable.
+*.pdf
+PART1_IMPLEMENTATION_PLAN.md

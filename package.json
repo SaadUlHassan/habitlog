@@ -1,0 +1,24 @@
+{
+  "name": "habitlog",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Habit tracking service — take-home part 1",
+  "workspaces": [
+    "api",
+    "web"
+  ],
+  "scripts": {
+    "prepare": "node scripts/ensure-env.mjs",
+    "dev": "npm run db:up && (npm run dev:api & npm run dev:web & wait)",
+    "dev:api": "npm run dev --workspace=api",
+    "dev:web": "npm run dev --workspace=web",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && npm run db:up",
+    "test": "npm run test --workspace=api",
+    "typecheck": "npm run typecheck --workspace=api && npm run typecheck --workspace=web"
+  },
+  "engines": {
+    "node": ">=20.12"
+  }
+}
