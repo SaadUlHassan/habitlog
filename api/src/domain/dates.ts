@@ -32,12 +32,25 @@ function fromUtcAnchor(anchor: Date): string {
   return anchor.toISOString().slice(0, 10);
 }
 
-/**
- * The calendar date at `instant` for someone in `timeZone`.
- * 'en-CA' is the locale that formats as YYYY-MM-DD.
- */
+/** The calendar date at `instant` for someone in `timeZone`. */
 export function localDateFor(instant: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone }).format(instant);
+  const formatted = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(instant);
+
+  // en-CA formats as YYYY-MM-DD, but that is a property of the locale data rather
+  // than a guarantee of the API: a small-ICU build without en-CA would fall back to
+  // another order. Every date in the system flows through here and is parsed
+  // downstream, so a fallback has to fail loudly instead of quietly producing
+  // 17/08/2026 and letting it spread.
+  if (!LOCAL_DATE_PATTERN.test(formatted)) {
+    throw new Error(`Expected YYYY-MM-DD from Intl for ${timeZone}, got: ${formatted}`);
+  }
+
+  return formatted;
 }
 
 export function isValidLocalDate(value: string): boolean {
