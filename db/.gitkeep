@@ -1,0 +1,2 @@
+# Schema and seed land here in Phase 1. Compose mounts this directory into
+# /docker-entrypoint-initdb.d, which runs its contents once on first boot.
